@@ -1,9 +1,10 @@
 import os
 import asyncio
-from discord.ext import commands
 import logging
-from keep_alive import keep_alive
 import aiosqlite
+import discord
+from discord.ext import commands
+from keep_alive import keep_alive
 
 logging.basicConfig(level=logging.INFO)
 
@@ -11,7 +12,8 @@ PREFIX = os.getenv("PREFIX", ".")
 TOKEN = os.getenv("DISCORD_TOKEN")
 DB_PATH = os.getenv("MOD_DB", "data/mod.db")
 
-intents = commands.Intents.default()
+# Corrected: Intents come from discord, not commands
+intents = discord.Intents.default()
 intents.members = True
 intents.guilds = True
 
@@ -23,8 +25,9 @@ async def on_ready():
     logging.info("------")
 
 async def ensure_db():
-    # create data folder and tables if needed
+    # Create data folder if it doesn't exist
     os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
+    
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute('''
             CREATE TABLE IF NOT EXISTS warns (
@@ -51,10 +54,12 @@ async def ensure_db():
 
 async def main():
     await ensure_db()
-    # load cogs
+
+    # Load the moderation cog
     bot.add_cog(await __import__("cogs.mod", fromlist=["ModCog"]).ModCog(bot, DB_PATH))
 
-    keep_alive()  # start flask server in thread
+    # Start the keep-alive server
+    keep_alive()
 
     if not TOKEN:
         raise RuntimeError("DISCORD_TOKEN environment variable not set")
