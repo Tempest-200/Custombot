@@ -21,11 +21,10 @@ intents.guilds = True
 
 bot = commands.Bot(command_prefix=PREFIX, intents=intents, help_command=None)
 
-
 @bot.event
 async def on_ready():
-logging.info(f"Logged in as {bot.user} (ID: {bot.user.id})")
-logging.info("------")
+    logging.info(f"Logged in as {bot.user} (ID: {bot.user.id})")
+    logging.info("------")
 
 
 async def ensure_db():
