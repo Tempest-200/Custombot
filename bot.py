@@ -5,6 +5,7 @@ import aiosqlite
 import discord
 from discord.ext import commands
 from keep_alive import keep_alive
+from cogs.mod import ModCog  # changed import and removed await on constructor
 
 logging.basicConfig(level=logging.INFO)
 
@@ -56,7 +57,7 @@ async def main():
     await ensure_db()
 
     # Load the moderation cog
-    bot.add_cog(await __import__("cogs.mod", fromlist=["ModCog"]).ModCog(bot, DB_PATH))
+    await bot.add_cog(ModCog(bot, DB_PATH))  # <- no 'await' on constructor
 
     # Start the keep-alive server
     keep_alive()
@@ -71,4 +72,3 @@ if __name__ == "__main__":
         asyncio.run(main())
     except KeyboardInterrupt:
         logging.info("Shutting down")
-
