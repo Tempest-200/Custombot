@@ -11,7 +11,11 @@ class ModCog(commands.Cog):
     def __init__(self, bot: commands.Bot, db_path: str):
         self.bot = bot
         self.db_path = db_path
-        self.bot.loop.create_task(self._restore_punishments())
+        # Removed: self.bot.loop.create_task(self._restore_punishments())
+
+    async def setup_hook(self):
+        # Safe place to start async tasks in Discord.py 2.x
+        asyncio.create_task(self._restore_punishments())
 
     @staticmethod
     def _timestamp(dt: datetime) -> str:
