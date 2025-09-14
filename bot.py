@@ -13,10 +13,11 @@ PREFIX = os.getenv("PREFIX", ".")
 TOKEN = os.getenv("DISCORD_TOKEN")
 DB_PATH = os.getenv("MOD_DB", "data/mod.db")
 
-# Corrected: Intents come from discord, not commands
+# Corrected: Intents come from discord, with privileged intents enabled
 intents = discord.Intents.default()
-intents.members = True
 intents.guilds = True
+intents.members = True  # required for mute, warns, etc.
+intents.message_content = False  # enable True only if reading messages
 
 bot = commands.Bot(command_prefix=PREFIX, intents=intents, help_command=None)
 
@@ -72,3 +73,4 @@ if __name__ == "__main__":
         asyncio.run(main())
     except KeyboardInterrupt:
         logging.info("Shutting down")
+
