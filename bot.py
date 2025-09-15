@@ -16,8 +16,8 @@ DB_PATH = os.getenv("MOD_DB", "data/mod.db")
 # ✅ Intents
 intents = discord.Intents.default()
 intents.guilds = True
-intents.members = True  # required for mute, warns, etc.
-intents.message_content = True  # ✅ MUST be True for prefix commands
+intents.members = True
+intents.message_content = True
 
 bot = commands.Bot(command_prefix=PREFIX, intents=intents, help_command=None)
 
@@ -31,12 +31,28 @@ async def on_ready():
 async def ping(ctx):
     await ctx.send("Pong!")
 
+# ✅ Avatar command
+@bot.command(name="avatar")
+async def avatar(ctx, user: discord.User = None):
+    if user is None:
+        user = ctx.author  # default to message author
+    
+    embed = discord.Embed(
+        title=f"🖼️ Avatar of {user}",
+        color=discord.Color.blurple()
+    )
+    embed.set_image(url=user.display_avatar.url)
+    embed.set_footer(text="Click the link above to open full image")
+    embed.url = user.display_avatar.url  # clickable title
+    
+    await ctx.send(embed=embed)
+
 # ✅ Custom help command
 @bot.command(name="help")
 async def custom_help(ctx):
     embed = discord.Embed(
         title="📘 Moderation Commands",
-        description="Here are all available moderation commands and their usage.",
+        description="Here are all available commands and their usage.",
         color=discord.Color.blue()
     )
 
@@ -72,12 +88,17 @@ async def custom_help(ctx):
     )
     embed.add_field(
         name="⏳ Tempban",
-        value=f"**Usage:** `{PREFIX}tempban <user_id|@mention> <duration> [reason]`\nBans a user temporarily (e.g. `10m`, `2h`, `7d`).",
+        value=f"**Usage:** `{PREFIX}tempban <user_id|@mention> <duration> [reason]`\nBans a user temporarily.",
         inline=False
     )
     embed.add_field(
         name="🏓 Ping",
         value=f"**Usage:** `{PREFIX}ping`\nChecks if the bot is alive.",
+        inline=False
+    )
+    embed.add_field(
+        name="🖼️ Avatar",
+        value=f"**Usage:** `{PREFIX}avatar [user_id|@mention]`\nShows the avatar of yourself or another user.",
         inline=False
     )
 
@@ -94,9 +115,9 @@ async def custom_help(ctx):
     )
 
     embed.set_footer(text="Dex Moderation Bot • Use commands responsibly ✅")
-
     await ctx.send(embed=embed)
 
+# ✅ Database setup
 async def ensure_db():
     os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
     
@@ -118,12 +139,13 @@ async def ensure_db():
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 guild_id INTEGER NOT NULL,
                 user_id INTEGER NOT NULL,
-                type TEXT NOT NULL, -- mute or tempban
+                type TEXT NOT NULL,
                 expires_at INTEGER NOT NULL
             )
         ''')
         await db.commit()
 
+# ✅ Main loop
 async def main():
     await ensure_db()
     await bot.add_cog(ModCog(bot, DB_PATH))
@@ -139,6 +161,7 @@ if __name__ == "__main__":
         asyncio.run(main())
     except KeyboardInterrupt:
         logging.info("Shutting down")
+
 
     except KeyboardInterrupt:
         logging.info("Shutting down")
