@@ -13,7 +13,7 @@ PREFIX = os.getenv("PREFIX", ".")
 TOKEN = os.getenv("DISCORD_TOKEN")
 DB_PATH = os.getenv("MOD_DB", "data/mod.db")
 
-# Corrected: Intents come from discord, with privileged intents enabled
+# ✅ Intents
 intents = discord.Intents.default()
 intents.guilds = True
 intents.members = True  # required for mute, warns, etc.
@@ -42,7 +42,7 @@ async def custom_help(ctx):
 
     embed.add_field(
         name="⚠️ Warn",
-        value=f"**Usage:** `{PREFIX}warn <user_id|@mention> [reason]`\nWarns a user. 2 warns = auto mute.",
+        value=f"**Usage:** `{PREFIX}warn <user_id|@mention> [reason]`\nWarns a user. Escalates with multiple warns.",
         inline=False
     )
     embed.add_field(
@@ -78,6 +78,18 @@ async def custom_help(ctx):
     embed.add_field(
         name="🏓 Ping",
         value=f"**Usage:** `{PREFIX}ping`\nChecks if the bot is alive.",
+        inline=False
+    )
+
+    # 🔥 Warn escalation system
+    embed.add_field(
+        name="📈 Warn Escalation",
+        value=(
+            "• **2 active warns** → Auto mute for **1 hour**\n"
+            "• **3 active warns** → Auto mute for **2 hours**\n"
+            "• **4 active warns** → Auto mute for **5 hours**\n"
+            "• **5 active warns** → Permanent ban"
+        ),
         inline=False
     )
 
@@ -125,6 +137,9 @@ async def main():
 if __name__ == "__main__":
     try:
         asyncio.run(main())
+    except KeyboardInterrupt:
+        logging.info("Shutting down")
+
     except KeyboardInterrupt:
         logging.info("Shutting down")
 
