@@ -7,6 +7,13 @@ from datetime import datetime, timedelta
 
 DATE_FMT = "%B %d, %Y at %I:%M %p"
 LOG_CHANNEL_ID = 1417097768744517753  # logging channel
+ALLOWED_ROLES = {
+    1297233763343794327,
+    1338595907918233600,
+    1338631925698658434,
+    1335300047935377468,
+    1365412907067899976,
+}
 
 class ModCog(commands.Cog):
     def __init__(self, bot: commands.Bot, db_path: str):
@@ -19,6 +26,11 @@ class ModCog(commands.Cog):
     @staticmethod
     def _timestamp(dt: datetime) -> str:
         return dt.strftime(DATE_FMT)
+
+    # ---------------- PERMISSION CHECK ---------------- #
+
+    def _has_permission(self, ctx):
+        return any(r.id in ALLOWED_ROLES for r in ctx.author.roles)
 
     # ---------------- WARN SYSTEM ---------------- #
 
@@ -87,7 +99,7 @@ class ModCog(commands.Cog):
         if warns is not None:
             embed.add_field(name="Warn Count", value=f"{warns} active warns", inline=False)
         if expires_at:
-            embed.add_field(name="Expires", value=expires_at.strftime(DATE_FMT), inline=False)
+            embed.add_field(name="Until", value=expires_at.strftime(DATE_FMT), inline=False)
         embed.add_field(name="Responsible Moderator", value=ctx.author.mention, inline=False)
 
         try:
@@ -109,7 +121,7 @@ class ModCog(commands.Cog):
             if warns is not None:
                 log_embed.add_field(name="Warn Count", value=f"{warns} active warns", inline=False)
             if expires_at:
-                log_embed.add_field(name="Expires", value=expires_at.strftime(DATE_FMT), inline=False)
+                log_embed.add_field(name="Until", value=expires_at.strftime(DATE_FMT), inline=False)
             log_embed.add_field(name="Responsible Moderator", value=ctx.author.mention, inline=False)
             await log_channel.send(embed=log_embed)
 
@@ -117,71 +129,91 @@ class ModCog(commands.Cog):
 
     @commands.command()
     async def warn(self, ctx, member: discord.Member, *, reason: str = "No reason"):
-        """Warn a user (2 warns = mute)."""
+        if not self._has_permission(ctx):
+            return
         await self._add_warn(ctx.guild.id, member.id, ctx.author.id, reason, permanent=False)
         warns = await self._count_unexpired_warns(ctx.guild.id, member.id)
 
-        # Chat confirmation
-        await ctx.send(f"⚠️ {member.mention} has been warned.")
-
+        # Confirmation
+        await ctx.send(f"{member.name} has been warned for the reason: {reason}")
         expires_at = datetime.utcnow() + timedelta(days=60)
         await self._send_dm_and_log(member, ctx, "warned", reason, expires_at=expires_at, warns=warns)
 
-        if warns >= 2:  # auto-mute
-            role = await self._ensure_muted_role(ctx.guild)
+        # Escalation
+        role = await self._ensure_muted_role(ctx.guild)
+        if warns == 2:
+            delta = timedelta(hours=1)
             await member.add_roles(role, reason="Auto-mute after 2 warns")
-            await ctx.send(f"🔇 {member.mention} has been auto-muted for accumulating 2 warns.")
-            await self._send_dm_and_log(member, ctx, "muted (auto)", "Reached 2 warns")
+            await self._send_dm_and_log(member, ctx, "muted", "Reached 2 warns", "1h", datetime.utcnow() + delta, warns=warns)
+            await asyncio.sleep(delta.total_seconds())
+            await member.remove_roles(role, reason="Auto-mute expired")
+        elif warns == 3:
+            delta = timedelta(hours=2)
+            await member.add_roles(role, reason="Auto-mute after 3 warns")
+            await self._send_dm_and_log(member, ctx, "muted", "Reached 3 warns", "2h", datetime.utcnow() + delta, warns=warns)
+            await asyncio.sleep(delta.total_seconds())
+            await member.remove_roles(role, reason="Auto-mute expired")
+        elif warns == 4:
+            delta = timedelta(hours=5)
+            await member.add_roles(role, reason="Auto-mute after 4 warns")
+            await self._send_dm_and_log(member, ctx, "muted", "Reached 4 warns", "5h", datetime.utcnow() + delta, warns=warns)
+            await asyncio.sleep(delta.total_seconds())
+            await member.remove_roles(role, reason="Auto-mute expired")
+        elif warns >= 5:
+            await member.ban(reason="Reached 5 warns")
+            await self._send_dm_and_log(member, ctx, "banned", "Reached 5 warns", warns=warns)
 
     @commands.command()
     async def mute(self, ctx, member: discord.Member, duration: str = None, *, reason: str = "No reason"):
-        """Mute a user (supports duration like 10m, 2h, 7d)."""
+        if not self._has_permission(ctx):
+            return
         role = await self._ensure_muted_role(ctx.guild)
         await member.add_roles(role, reason=reason)
-        await ctx.send(f"🔇 {member.mention} has been muted.")
 
         delta = self._parse_duration(duration)
         if delta:
             expires_at = datetime.utcnow() + delta
+            await ctx.send(f"{member.name} has been muted for {duration} until {expires_at.strftime(DATE_FMT)} for the reason: {reason}")
             await self._send_dm_and_log(member, ctx, "muted", reason, duration, expires_at)
             await asyncio.sleep(delta.total_seconds())
             await member.remove_roles(role, reason="Temporary mute expired")
-            await ctx.send(f"🔊 {member.mention} has been unmuted (mute expired).")
         else:
+            await ctx.send(f"{member.name} has been muted for the reason: {reason}")
             await self._send_dm_and_log(member, ctx, "muted", reason)
 
     @commands.command()
     async def unmute(self, ctx, member: discord.Member):
-        """Unmute a user manually."""
+        if not self._has_permission(ctx):
+            return
         role = await self._ensure_muted_role(ctx.guild)
         if role in member.roles:
             await member.remove_roles(role, reason="Manual unmute")
-            await ctx.send(f"🔊 {member.mention} has been unmuted.")
+            await ctx.send(f"{member.name} has been unmuted.")
             await self._send_dm_and_log(member, ctx, "unmuted", "Manual unmute")
-        else:
-            await ctx.send("That user is not muted.")
 
     @commands.command()
     async def kick(self, ctx, member: discord.Member, *, reason: str = "No reason"):
-        """Kick a user."""
+        if not self._has_permission(ctx):
+            return
         await member.kick(reason=reason)
-        await ctx.send(f"👢 {member} has been kicked.")
+        await ctx.send(f"{member.name} has been kicked for the reason: {reason}")
         await self._send_dm_and_log(member, ctx, "kicked", reason)
 
     @commands.command()
     async def ban(self, ctx, member: discord.Member, *, reason: str = "No reason"):
-        """Ban a user."""
+        if not self._has_permission(ctx):
+            return
         await member.ban(reason=reason)
-        await ctx.send(f"🔨 {member} has been banned.")
+        await ctx.send(f"{member.name} has been banned for the reason: {reason}")
         await self._send_dm_and_log(member, ctx, "banned", reason)
 
     @commands.command()
     async def unban(self, ctx, user_id: int):
-        """Unban a user by ID."""
+        if not self._has_permission(ctx):
+            return
         user = await self.bot.fetch_user(user_id)
         await ctx.guild.unban(user)
-        await ctx.send(f"♻️ {user} has been unbanned.")
-        # Send only to logs, can't DM banned user
+        await ctx.send(f"{user} has been unbanned.")
         log_channel = ctx.guild.get_channel(LOG_CHANNEL_ID)
         if log_channel:
             embed = discord.Embed(
@@ -195,24 +227,24 @@ class ModCog(commands.Cog):
 
     @commands.command()
     async def tempban(self, ctx, member: discord.Member, duration: str, *, reason: str = "No reason"):
-        """Temporarily ban a user."""
+        if not self._has_permission(ctx):
+            return
         delta = self._parse_duration(duration)
         if not delta:
             return await ctx.send("Invalid duration. Use format like `10m`, `2h`, `7d`.")
         await member.ban(reason=reason)
-        await ctx.send(f"⏳ {member} has been temp-banned for {duration}.")
         expires_at = datetime.utcnow() + delta
+        await ctx.send(f"{member.name} has been temp-banned for {duration} until {expires_at.strftime(DATE_FMT)} for the reason: {reason}")
         await self._send_dm_and_log(member, ctx, "temp-banned", reason, duration, expires_at)
         await asyncio.sleep(delta.total_seconds())
         await ctx.guild.unban(member)
-        await ctx.send(f"♻️ {member} has been unbanned (tempban expired).")
 
     # ---------------- TASKS ---------------- #
 
     async def _restore_punishments(self):
-        """Future: restore mutes/tempbans from DB if you add persistence."""
         pass
 
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(ModCog(bot, db_path="mod.db"))
+
