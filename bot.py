@@ -30,6 +30,13 @@ async def on_ready():
     logging.info("Slash commands synced ✅")
     logging.info("------")
 
+# ✅ Owner-only say command
+@bot.command(name="say")
+@commands.is_owner()
+async def say(ctx, *, message: str):
+    await ctx.message.delete()  # delete your command message (optional)
+    await ctx.send(message)
+
 # ✅ Database setup
 async def ensure_db():
     os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
@@ -78,3 +85,4 @@ if __name__ == "__main__":
         asyncio.run(main())
     except KeyboardInterrupt:
         logging.info("Shutting down")
+
