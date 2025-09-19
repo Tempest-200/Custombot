@@ -30,11 +30,10 @@ async def on_ready():
     logging.info("Slash commands synced ✅")
     logging.info("------")
 
-# ✅ Owner-only say command
+# ✅ Public say command
 @bot.command(name="say")
-@commands.is_owner()
 async def say(ctx, *, message: str):
-    await ctx.message.delete()  # delete your command message (optional)
+    await ctx.message.delete()  # deletes the user's command (optional, remove if you want it to stay)
     await ctx.send(message)
 
 # ✅ Database setup
