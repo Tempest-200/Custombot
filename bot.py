@@ -4,6 +4,7 @@ import logging
 import aiosqlite
 import discord
 from discord.ext import commands
+from discord import app_commands
 from keep_alive import keep_alive
 from cogs.mod import ModCog
 
